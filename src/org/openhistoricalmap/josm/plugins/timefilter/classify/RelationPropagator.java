@@ -60,12 +60,12 @@ public final class RelationPropagator {
     private static long[] relationIdsAndChildLists(Iterable<Relation> relations, List<long[]> out) {
         List<Long> ids = new ArrayList<>();
         for (Relation r : relations) {
-            ids.add(r.getUniqueId());
+            ids.add(PrimitiveKey.of(r));
             long[] memberIds = new long[r.getMembersCount()];
             int i = 0;
             for (RelationMember member : r.getMembers()) {
                 OsmPrimitive child = member.getMember();
-                memberIds[i++] = child == null ? Long.MIN_VALUE : child.getUniqueId();
+                memberIds[i++] = child == null ? Long.MIN_VALUE : PrimitiveKey.of(child);
             }
             out.add(memberIds);
         }

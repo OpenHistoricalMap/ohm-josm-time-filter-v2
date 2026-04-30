@@ -19,9 +19,23 @@ import org.openstreetmap.josm.plugins.PluginInformation;
  *     selectable) and are visually faded by an in-memory MapPaint style
  *     (see {@code OhmTierStyleSource}).
  *
- * The in-memory paint style needs a one-time cleanup of any phantom row
- * in {@code mappaint.style.entries} that a crashed previous session
- * could have left behind.
+ * Lifecycle:
+ *   - Construction: {@link StyleRegistration#cleanupStalePrefs()} runs
+ *     to strip any phantom row in {@code mappaint.style.entries} from a
+ *     previous session that didn't get a chance to detach.
+ *   - Shutdown: JOSM has no {@code Plugin.destroy()} hook. We use the
+ *     final map-frame transition ({@code mapFrameInitialized(_, null)})
+ *     as our shutdown signal — it fires when the last layer is closed
+ *     during normal JOSM exit. For abnormal exits (crashes, force
+ *     quit), anything we leak (primitive flags, the in-memory style
+ *     instance in {@code MapPaintStyles}, the marker row in prefs) is
+ *     recovered on the next startup: a fresh JOSM ignores the dataset's
+ *     old flags, and {@code cleanupStalePrefs()} strips the marker row
+ *     before we reattach. The architecture is "leak-safe by reset",
+ *     not "leak-free at shutdown".
+ *   - Mid-session disable via the Plugin Preferences pane requires a
+ *     JOSM restart (JOSM's standard behaviour for plugin changes), so
+ *     it reduces to the shutdown + startup path above.
  */
 public class TimeFilterPlugin extends Plugin {
 

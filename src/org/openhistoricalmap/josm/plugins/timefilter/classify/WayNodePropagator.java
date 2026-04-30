@@ -48,12 +48,12 @@ public final class WayNodePropagator {
     private static long[] wayIdsAndChildLists(Iterable<Way> ways, List<long[]> out) {
         List<Long> ids = new ArrayList<>();
         for (Way w : ways) {
-            ids.add(w.getUniqueId());
+            ids.add(PrimitiveKey.of(w));
             List<Node> nodes = w.getNodes();
             long[] nodeIds = new long[nodes.size()];
             for (int i = 0; i < nodes.size(); i++) {
                 Node n = nodes.get(i);
-                nodeIds[i] = n == null ? Long.MIN_VALUE : n.getUniqueId();
+                nodeIds[i] = n == null ? Long.MIN_VALUE : PrimitiveKey.of(n);
             }
             out.add(nodeIds);
         }

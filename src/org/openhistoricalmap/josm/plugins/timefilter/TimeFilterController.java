@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.openhistoricalmap.josm.plugins.timefilter.classify.ClassificationCache;
 import org.openhistoricalmap.josm.plugins.timefilter.classify.Classifier;
+import org.openhistoricalmap.josm.plugins.timefilter.classify.PrimitiveKey;
 import org.openhistoricalmap.josm.plugins.timefilter.classify.RelationPropagator;
 import org.openhistoricalmap.josm.plugins.timefilter.classify.WayNodePropagator;
 import org.openhistoricalmap.josm.plugins.timefilter.paint.OhmTierStyleSource;
@@ -212,14 +213,15 @@ public final class TimeFilterController {
             if (!p.hasKeys() && t == Tier.BRIGHT) {
                 t = Tier.FAINT;
             }
-            byId.put(p.getUniqueId(), t);
+            long key = PrimitiveKey.of(p);
+            byId.put(key, t);
             // Track primitives that carry their own date tags so
             // propagation doesn't override their classification. Critical
             // for chronology relations: their child boundary relations are
             // independently date-tagged, and the chronology's wide range
             // shouldn't promote them.
             if (p.hasKey("start_date") || p.hasKey("end_date")) {
-                hasOwnDateTags.add(p.getUniqueId());
+                hasOwnDateTags.add(key);
             }
         }
 
@@ -250,7 +252,7 @@ public final class TimeFilterController {
         dataSet.beginUpdate();
         try {
             for (OsmPrimitive p : iterateAll(dataSet)) {
-                Tier t = byId.getOrDefault(p.getUniqueId(), Tier.FAINT);
+                Tier t = byId.getOrDefault(PrimitiveKey.of(p), Tier.FAINT);
                 if (t == Tier.FAINT && !p.isDisabledAndHidden()) {
                     p.setDisabledState(true);
                     if (p.isSelected()) deselect.add(p);

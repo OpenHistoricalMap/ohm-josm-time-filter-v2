@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.util.Map;
 
 import org.openhistoricalmap.josm.plugins.timefilter.classify.ClassificationCache;
+import org.openhistoricalmap.josm.plugins.timefilter.classify.PrimitiveKey;
 import org.openhistoricalmap.josm.plugins.timefilter.model.Tier;
 import org.openstreetmap.josm.data.osm.IPrimitive;
 import org.openstreetmap.josm.gui.mappaint.Cascade;
@@ -55,7 +56,7 @@ public class OhmTierStyleSource extends MapCSSStyleSource {
         if (cache.isEmpty()) {
             return;
         }
-        Tier tier = cache.get(osm.getUniqueId());
+        Tier tier = cache.get(PrimitiveKey.of(osm));
         if (tier != Tier.NORMAL) {
             return;
         }
