@@ -1,0 +1,36 @@
+#!/bin/sh
+# Append `Co-Authored-By: Claude <noreply@anthropic.com>` to every commit
+# message that doesn't already contain it.
+#
+# Activate per-clone with:
+#   git config core.hooksPath .githooks
+#
+# This complements `git config commit.template .gitmessage`, which only
+# applies to interactive `git commit` (no -m). The hook below covers the
+# `-m`, `-F`, and amend paths too.
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
+# Don't append for these sources — git supplies its own message text or
+# the user is editing an existing commit's message.
+case "$COMMIT_SOURCE" in
+    merge|squash) exit 0 ;;
+esac
+
+TRAILER="Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# Already present (perhaps from the template, an amend, or manual entry)?
+if grep -qF "$TRAILER" "$COMMIT_MSG_FILE"; then
+    exit 0
+fi
+
+# Strip a single trailing newline if present, then append a blank line +
+# the trailer. This keeps the trailer block tidy whether the message
+# ends with a newline or not.
+TMP="$(mktemp)"
+{
+    sed -e '$ {/^$/d}' "$COMMIT_MSG_FILE"
+    printf '\n%s\n' "$TRAILER"
+} > "$TMP"
+mv "$TMP" "$COMMIT_MSG_FILE"

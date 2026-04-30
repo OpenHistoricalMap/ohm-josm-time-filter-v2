@@ -11,8 +11,14 @@ lib/
 # Test output
 test/results.txt
 
-# Test files
-test/test_chronologies.osm
+# Large local test fixtures (kept locally for reproducing reported bugs)
+test_osm_data.osm
+test/test_*.osm
+
+# Stray screenshots / one-off images outside resources/
+selection-icon.png
+*.png
+!resources/**/*.png
 
 # macOS
 .DS_Store

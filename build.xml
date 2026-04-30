@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Self-contained build for the ohm-time-filter plugin.
+
+  Why not import build-common.xml?
+    The standard JOSM plugin build harness assumes the plugin sits at
+    `<root>/plugins/<plugin>/` next to a sibling `<root>/core/` checkout,
+    and pulls in Ivy, ErrorProne, JaCoCo, and tooling from sibling
+    `00_*` directories. Our layout nests `core/` inside the plugin and
+    none of those sibling tool dirs exist, so we compile directly
+    against `core/dist/josm-custom.jar` and assemble the plugin manifest
+    by hand. The manifest entries match what build-common.xml would
+    produce (Plugin-Class, Plugin-Mainversion, etc.).
+-->
+<project name="ohm-time-filter" default="dist" basedir=".">
+
+    <property name="plugin.main.version"     value="19439"/>
+    <property name="plugin.author"           value="Jeff Meyer"/>
+    <property name="plugin.class"            value="org.openhistoricalmap.josm.plugins.timefilter.TimeFilterPlugin"/>
+    <property name="plugin.description"      value="OpenHistoricalMap time filter: highlight features extant at a chosen date, fade the rest."/>
+    <property name="plugin.icon"             value="images/dialogs/timefilter.svg"/>
+    <property name="plugin.link"             value="https://github.com/OpenHistoricalMap"/>
+    <property name="plugin.canloadatruntime" value="true"/>
+    <property name="plugin.minimum.java.version" value="17"/>
+
+    <property name="josm"                    location="${basedir}/core/dist/josm-custom.jar"/>
+    <property name="src.dir"                 location="${basedir}/src"/>
+    <property name="resources.dir"           location="${basedir}/resources"/>
+    <property name="build.dir"               location="${basedir}/build"/>
+    <property name="dist.dir"                location="${basedir}/dist"/>
+    <property name="test.src.dir"            location="${basedir}/test/unit"/>
+    <property name="test.build.dir"          location="${basedir}/build-test"/>
+    <property name="lib.dir"                 location="${basedir}/lib"/>
+    <property name="plugin.jar"              location="${dist.dir}/${ant.project.name}.jar"/>
+    <property name="java.lang.version"       value="17"/>
+
+    <path id="compile.classpath">
+        <pathelement location="${josm}"/>
+    </path>
+
+    <path id="test.classpath">
+        <pathelement location="${josm}"/>
+        <pathelement location="${build.dir}"/>
+        <fileset dir="${lib.dir}" erroronmissingdir="no">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="check-josm">
+        <available file="${josm}" property="josm.present"/>
+        <fail unless="josm.present">
+Missing ${josm}.
+
+The plugin compiles against JOSM core's prebuilt jar. Set up the JOSM
+trunk checkout at ./core/ first:
+
+    svn checkout https://josm.openstreetmap.de/svn/trunk core
+
+If core/ already exists but lacks dist/josm-custom.jar, run `ant dist`
+inside core/ to build it (requires Ivy + network; a recent SVN checkout
+ships with dist/josm-custom.jar prebuilt).
+        </fail>
+    </target>
+
+    <target name="init" depends="check-josm">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}" destdir="${build.dir}" encoding="UTF-8"
+               release="${java.lang.version}" includeantruntime="false"
+               debug="true" deprecation="true">
+            <classpath refid="compile.classpath"/>
+            <compilerarg value="-Xlint:all"/>
+            <compilerarg value="-Xlint:-serial"/>
+        </javac>
+    </target>
+
+    <target name="dist" depends="compile">
+        <copy todir="${build.dir}/images" failonerror="no" includeemptydirs="no">
+            <fileset dir="${resources.dir}/images" erroronmissingdir="no"/>
+        </copy>
+        <copy todir="${build.dir}" failonerror="no">
+            <fileset dir=".">
+                <include name="LICENSE"/>
+                <include name="ATTRIBUTION.md"/>
+            </fileset>
+        </copy>
+        <jar destfile="${plugin.jar}" basedir="${build.dir}" duplicate="preserve" level="9">
+            <manifest>
+                <attribute name="Plugin-Class"        value="${plugin.class}"/>
+                <attribute name="Plugin-Description"  value="${plugin.description}"/>
+                <attribute name="Plugin-Mainversion"  value="${plugin.main.version}"/>
+                <attribute name="Plugin-Version"      value="0.1.0"/>
+                <attribute name="Plugin-Icon"         value="${plugin.icon}"/>
+                <attribute name="Plugin-Link"         value="${plugin.link}"/>
+                <attribute name="Plugin-Canloadatruntime" value="${plugin.canloadatruntime}"/>
+                <attribute name="Plugin-Minimum-Java-Version" value="${plugin.minimum.java.version}"/>
+                <attribute name="Author"              value="${plugin.author}"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${test.build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="test-compile" depends="dist">
+        <available file="${test.src.dir}" type="dir" property="test.present"/>
+        <fail unless="test.present" message="No tests at ${test.src.dir}"/>
+        <mkdir dir="${test.build.dir}"/>
+        <javac srcdir="${test.src.dir}" destdir="${test.build.dir}" encoding="UTF-8"
+               release="${java.lang.version}" includeantruntime="false" debug="true">
+            <classpath refid="test.classpath"/>
+        </javac>
+    </target>
+
+    <target name="test" depends="test-compile">
+        <junit fork="yes" haltonfailure="no" printsummary="yes" failureproperty="junit.failed">
+            <classpath>
+                <path refid="test.classpath"/>
+                <pathelement location="${test.build.dir}"/>
+            </classpath>
+            <formatter type="plain" usefile="false"/>
+            <batchtest>
+                <fileset dir="${test.src.dir}">
+                    <include name="**/*Test.java"/>
+                </fileset>
+            </batchtest>
+        </junit>
+        <fail if="junit.failed" message="Unit tests failed"/>
+    </target>
+
+    <target name="install" depends="dist">
+        <property environment="env"/>
+        <condition property="josm.plugins.dir" value="${env.APPDATA}/JOSM/plugins">
+            <os family="windows"/>
+        </condition>
+        <condition property="josm.plugins.dir" value="${user.home}/Library/JOSM/plugins">
+            <os family="mac"/>
+        </condition>
+        <condition property="josm.plugins.dir" value="${user.home}/.local/share/JOSM/plugins">
+            <and>
+                <not><os family="windows"/></not>
+                <not><os family="mac"/></not>
+            </and>
+        </condition>
+        <mkdir dir="${josm.plugins.dir}"/>
+        <copy file="${plugin.jar}" todir="${josm.plugins.dir}"/>
+        <echo message="Installed ${plugin.jar} to ${josm.plugins.dir}"/>
+    </target>
+
+    <target name="runjosm" depends="install">
+        <java jar="${josm}" fork="true"/>
+    </target>
+
+    <target name="help">
+        <echo>
+Targets:
+  dist     (default) Build ${ant.project.name}.jar
+  test     Compile and run unit tests
+  clean    Remove build artifacts
+  install  Build and copy jar to your local JOSM plugins dir
+  runjosm  Install plugin and start JOSM
+        </echo>
+    </target>
+</project>
