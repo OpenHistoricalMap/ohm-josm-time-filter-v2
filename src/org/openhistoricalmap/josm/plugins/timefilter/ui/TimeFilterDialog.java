@@ -81,7 +81,7 @@ public final class TimeFilterDialog extends ToggleDialog {
             "timefilter",
             tr("Highlight features extant at a chosen date; fade the rest."),
             Shortcut.registerShortcut(
-                "ohm-time-filter:dialog",
+                "OHM_Time_Filter:dialog",
                 tr("Toggle: {0}", tr("OHM Time Filter")),
                 java.awt.event.KeyEvent.VK_O,
                 Shortcut.NONE),

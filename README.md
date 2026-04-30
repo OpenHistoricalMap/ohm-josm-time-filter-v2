@@ -33,7 +33,7 @@ filter stays hidden), it never reveals.
 
 ## Install
 
-Build the jar (see below) and copy `dist/ohm-time-filter.jar` into your JOSM
+Build the jar (see below) and copy `dist/OHM_Time_Filter.jar` into your JOSM
 plugins directory:
 
 - macOS: `~/Library/JOSM/plugins/`
@@ -52,7 +52,7 @@ svn checkout https://josm.openstreetmap.de/svn/trunk core
 
 # 2. Build the jar.
 ant dist
-# → dist/ohm-time-filter.jar
+# → dist/OHM_Time_Filter.jar
 
 # 3. (optional) Run unit tests.
 ant test

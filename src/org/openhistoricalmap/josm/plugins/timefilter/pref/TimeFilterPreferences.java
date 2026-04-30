@@ -6,12 +6,12 @@ import org.openstreetmap.josm.spi.preferences.Config;
 /**
  * Persistence for the dialog's set_point text and offset days.
  * Stored in JOSM's standard {@code Config.getPref()} so they persist
- * across restarts. Pref keys are namespaced under {@code ohm-time-filter.}.
+ * across restarts. Pref keys are namespaced under {@code OHM_Time_Filter.}.
  */
 public final class TimeFilterPreferences {
 
-    private static final String KEY_SET_POINT = "ohm-time-filter.set_point";
-    private static final String KEY_OFFSET_DAYS = "ohm-time-filter.offset_days";
+    private static final String KEY_SET_POINT = "OHM_Time_Filter.set_point";
+    private static final String KEY_OFFSET_DAYS = "OHM_Time_Filter.offset_days";
 
     private TimeFilterPreferences() {}
 

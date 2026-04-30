@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Self-contained build for the ohm-time-filter plugin.
+  Self-contained build for the OHM_Time_Filter plugin.
 
   Why not import build-common.xml?
     The standard JOSM plugin build harness assumes the plugin sits at
@@ -12,7 +12,7 @@
     by hand. The manifest entries match what build-common.xml would
     produce (Plugin-Class, Plugin-Mainversion, etc.).
 -->
-<project name="ohm-time-filter" default="dist" basedir=".">
+<project name="OHM_Time_Filter" default="dist" basedir=".">
 
     <property name="plugin.main.version"     value="19439"/>
     <property name="plugin.author"           value="Jeff Meyer"/>

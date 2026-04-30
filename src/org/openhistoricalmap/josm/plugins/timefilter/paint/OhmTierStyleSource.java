@@ -38,8 +38,8 @@ import org.openstreetmap.josm.gui.mappaint.mapcss.MapCSSStyleSource;
  */
 public class OhmTierStyleSource extends MapCSSStyleSource {
 
-    public static final String DISPLAY_NAME = "ohm-time-filter (in-memory)";
-    public static final String TITLE = "OHM Time Filter (live)";
+    public static final String DISPLAY_NAME = "OHM_Time_Filter (in-memory)";
+    public static final String TITLE = "OHM_Time_Filter (live)";
 
     private static final float NORMAL_ALPHA = 0.45f;
 
