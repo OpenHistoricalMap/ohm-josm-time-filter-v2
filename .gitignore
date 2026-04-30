@@ -1,0 +1,33 @@
+# Build output
+build/
+build-test/
+# dist/
+*.class
+*.jar
+
+# Test dependencies (download via apt install junit5, or fetch from Maven Central into lib/)
+lib/
+
+# Test output
+test/results.txt
+
+# Test files
+test/test_chronologies.osm
+
+# macOS
+.DS_Store
+._*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db
+
+# AI
+CLAUDE.md
+
+# JOSM source
+core/
