@@ -9,13 +9,13 @@ This is kind of like a timeslider without, you know, the slider thing.
 
 ## What it does
 
-Given a "filter date" and an optional ± window, the plugin classifies every
-primitive in your data layer based on its `start_date` / `end_date` tags:
+Given a "filter date" and an optional ± window, the plugin classifies every object (node, way, 
+or relation) in your data layer based on its `start_date` / `end_date` tags:
 
-- **On this day** — fully visible and selectable.
-- **Inside the window** — visible but visually faded; still selectable.
-- **Filtered out** — hidden from view (geometry, label, icon, way-corner
-  nodes); still in the dataset, selection is cleared.
+Objects that exist:
+- **On this day** — are fully visible and selectable.
+- **Inside the time window** — are visible but muted & still selectable.
+- **Outside of the time window** — are hidden from view, but are still in the dataset, selection is cleared.
 
 A row of date-shift buttons (`<C` `<X` `<Y` `<M` `<D` … `D>` `M>` `Y>` `X>` `C>`)
 lets you scrub backward and forward by century / decade / year / month / day,
