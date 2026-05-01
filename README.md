@@ -1,7 +1,11 @@
-# OHM Time Filter
+# ohm-josm-time-filter-v2: A JOSM OHM Time Filter
 
 A JOSM plugin for [OpenHistoricalMap](https://www.openhistoricalmap.org/)
-that highlights features extant at a chosen date and fades or hides the rest.
+that highlights features existing at a chosen date and fades or hides the rest.
+
+<img width="580" height="127" alt="Monosnap Java OpenStreetMap Editor 2026-04-30 20-34-42" src="https://github.com/user-attachments/assets/405c244f-34fb-4071-8a97-2ad112d28ce0" />
+
+This is kind of like a timeslider without, you know, the slider thing.
 
 ## What it does
 
