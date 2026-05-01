@@ -89,7 +89,7 @@ public final class TimeFilterDialog extends ToggleDialog {
         JPanel form = new JPanel(new GridBagLayout());
         form.setBorder(BorderFactory.createEmptyBorder(0, 8, 2, 8));
         GridBagConstraints g = new GridBagConstraints();
-        g.insets = new Insets(1, 2, 1, 2);
+        g.insets = new Insets(0, 2, 0, 2);
 
         // DisableShortcutsOnFocusGainedTextField unregisters JOSM's global
         // single-key/shift-key shortcuts while this field has focus, so
@@ -120,25 +120,26 @@ public final class TimeFilterDialog extends ToggleDialog {
         fsBtn.setToolTipText(tr("Filter to selection: average the selected primitives' dates and apply."));
         fsBtn.setMargin(new Insets(2, 4, 2, 4));
 
-        // Row 0: date controls hugging the left, FS button hugging the
-        // right (so it visually lines up near the right edge of the
-        // forward-shift chevron group below it). BorderLayout WEST/EAST
-        // gives WEST its preferred width, EAST its preferred width, and
-        // lets CENTER absorb the gap in the middle.
+        // Row 0: date controls centered in the panel, FS button flush
+        // right. BorderLayout.CENTER stretches to fill the remaining
+        // width; the inner FlowLayout.CENTER keeps the date controls
+        // visually centered in that region. BorderLayout.EAST takes its
+        // preferred width and stays anchored at the right edge.
         g.gridx = 0; g.gridy = 0; g.gridwidth = 2;
-        g.fill = GridBagConstraints.HORIZONTAL; g.weightx = 1;
-        g.anchor = GridBagConstraints.WEST;
+        g.fill = GridBagConstraints.HORIZONTAL;
+        g.weightx = 1;
+        g.anchor = GridBagConstraints.CENTER;
         JPanel topRow = new JPanel(new BorderLayout());
-        JPanel topLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-        topLeft.add(new JLabel(tr("Filter date")));
-        topLeft.add(setPointField);
-        topLeft.add(new JLabel("±"));
-        topLeft.add(offsetSpinner);
-        topLeft.add(new JLabel(tr("days")));
-        topRow.add(topLeft, BorderLayout.WEST);
+        JPanel topCenter = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
+        topCenter.add(new JLabel(tr("Filter date")));
+        topCenter.add(setPointField);
+        topCenter.add(new JLabel("±"));
+        topCenter.add(offsetSpinner);
+        topCenter.add(new JLabel(tr("days")));
+        topRow.add(topCenter, BorderLayout.CENTER);
         topRow.add(fsBtn, BorderLayout.EAST);
         form.add(topRow, g);
-        g.weightx = 0;  // reset so subsequent rows aren't pushed
+        g.weightx = 0;
 
         // Row 1: date-shift buttons
         g.gridx = 0; g.gridy = 1; g.gridwidth = 2;
@@ -221,17 +222,23 @@ public final class TimeFilterDialog extends ToggleDialog {
      * empty.
      */
     private static final Magnitude[] MAGNITUDES = {
-        new Magnitude("100Y", "100 years", 40, 100, 0, 0),
-        new Magnitude("10Y",  "10 years",  32,  10, 0, 0),
-        new Magnitude("Y",    "1 year",    22,   1, 0, 0),
-        new Magnitude("M",    "1 month",   22,   0, 1, 0),
-        new Magnitude("D",    "1 day",     22,   0, 0, 1),
+        new Magnitude("100Y", "100 years", 52, 100, 0, 0),
+        new Magnitude("10Y",  "10 years",  42,  10, 0, 0),
+        new Magnitude("Y",    "1 year",    30,   1, 0, 0),
+        new Magnitude("M",    "1 month",   30,   0, 1, 0),
+        new Magnitude("D",    "1 day",     30,   0, 0, 1),
     };
 
     private static final int SHIFT_BTN_HEIGHT = 26;
 
     private JPanel buildShiftButtonRow() {
-        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+        // WrapLayout — when the panel is too narrow to fit both 240-px
+        // chevron groups side-by-side, the forward group wraps to a
+        // second line below the back group instead of being clipped.
+        // vgap=2 keeps the row tight against the date row above while
+        // still leaving a small gap between the wrapped chevrons in
+        // narrow mode.
+        JPanel row = new JPanel(new WrapLayout(WrapLayout.CENTER, 4, 2));
 
         ShiftButtonGroup back = new ShiftButtonGroup("ohmtimefilter/group-back");
         for (Magnitude m : MAGNITUDES) {
@@ -256,6 +263,11 @@ public final class TimeFilterDialog extends ToggleDialog {
         b.setFont(b.getFont().deriveFont(java.awt.Font.BOLD, 11f));
         b.setMargin(new Insets(0, 2, 0, 2));
         b.setFocusable(false);
+        // Force a flat, compact rendering on macOS Aqua so a wider
+        // button (100Y) looks identical to a narrower one (Y / M / D)
+        // instead of getting bumped to the fuller "regular" style.
+        // No-op on non-macOS look-and-feels.
+        b.putClientProperty("JButton.buttonType", "square");
         Dimension size = new Dimension(m.buttonWidth, SHIFT_BTN_HEIGHT);
         b.setPreferredSize(size);
         b.setMinimumSize(size);

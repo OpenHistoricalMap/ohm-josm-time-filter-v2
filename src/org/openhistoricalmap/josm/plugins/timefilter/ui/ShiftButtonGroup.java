@@ -16,15 +16,16 @@ import org.openstreetmap.josm.tools.ImageProvider;
  * buttons in a single horizontal row centered within the chevron's
  * rectangular interior.
  *
- * The 212×42 dimensions match the SVG viewBox; FlowLayout {@code hgap=2,
- * vgap=8} centers five 32×26 buttons with ~22 px clearance on each end —
- * enough to keep the buttons clear of the chevron's left point
- * ({@code x=4..18}) and right-side indent ({@code x=198..208}).
+ * The 240×42 dimensions match the SVG viewBox; FlowLayout {@code hgap=2,
+ * vgap=8} centers five buttons (52 + 42 + 30 + 30 + 30 = 184 px of button
+ * face plus 8 px of inner gaps) with ~24 px clearance on each end — well
+ * inside the chevron's left point ({@code x=4..18}) and right-side
+ * indent ({@code x=226..236}).
  */
 final class ShiftButtonGroup extends JPanel {
 
     private static final long serialVersionUID = 1L;
-    private static final Dimension SIZE = new Dimension(212, 42);
+    private static final Dimension SIZE = new Dimension(240, 42);
 
     private final Image background;
 
