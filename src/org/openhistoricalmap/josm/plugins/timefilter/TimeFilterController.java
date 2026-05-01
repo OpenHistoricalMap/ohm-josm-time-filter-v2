@@ -59,6 +59,13 @@ public final class TimeFilterController {
     private final OhmTierStyleSource styleSource = new OhmTierStyleSource();
     private volatile boolean active;
     private volatile boolean styleAttached;
+    /**
+     * Selection captured at the moment the filter was first activated.
+     * Restored on {@link #clear()} so users don't lose their selection to
+     * primitives that became FAINT (and got auto-deselected) during Apply.
+     * {@code null} when no filter is active.
+     */
+    private volatile Set<OsmPrimitive> preFilterSelection;
 
     public TimeFilterController() {}
 
@@ -91,6 +98,13 @@ public final class TimeFilterController {
             lastResult.set(Result.invalid("No active OSM data layer."));
             org.openstreetmap.josm.gui.util.GuiHelper.runInEDT(onComplete);
             return;
+        }
+
+        // First time the filter activates, snapshot the user's current
+        // selection so we can restore it on Clear (FAINT primitives get
+        // deselected during Apply).
+        if (!active) {
+            preFilterSelection = new HashSet<>(dataSet.getSelected());
         }
 
         MainApplication.worker.submit(() -> {
@@ -135,6 +149,7 @@ public final class TimeFilterController {
      */
     public void clear() {
         DataSet ds = activeDataSet();
+        Set<OsmPrimitive> snapshot = preFilterSelection;
         if (ds != null) {
             ds.beginUpdate();
             try {
@@ -146,6 +161,15 @@ public final class TimeFilterController {
                 ds.endUpdate();
             }
             triggerJosmFilterRefresh(ds);
+            // Restore the pre-filter selection. Some of those primitives may
+            // have been deleted in the meantime; skip them.
+            if (snapshot != null && !snapshot.isEmpty()) {
+                List<OsmPrimitive> alive = new ArrayList<>();
+                for (OsmPrimitive p : snapshot) {
+                    if (!p.isDeleted()) alive.add(p);
+                }
+                if (!alive.isEmpty()) ds.setSelected(alive);
+            }
         }
         if (styleAttached) {
             StyleRegistration.detach(styleSource);
@@ -153,6 +177,7 @@ public final class TimeFilterController {
         }
         invalidateEditLayer();
         active = false;
+        preFilterSelection = null;
         ClassificationCache.set(ClassificationCache.EMPTY);
         lastResult.set(Result.EMPTY);
     }
@@ -197,60 +222,67 @@ public final class TimeFilterController {
     }
 
     private static Result classifyAndApply(DataSet dataSet, TimeWindow window) {
+        // Wrap the entire read-then-write pass in beginUpdate/endUpdate. The
+        // worker thread iterating ds.getNodes() / getWays() / getRelations()
+        // would otherwise race against EDT edits — JOSM's filter dialog uses
+        // the same pattern (FilterModel.executeFilters). beginUpdate is
+        // reentrant, so the inner mutations don't conflict.
         Map<Long, Tier> byId = new HashMap<>();
         Set<Long> hasOwnDateTags = new HashSet<>();
         int unparseable = 0;
-
-        for (OsmPrimitive p : iterateAll(dataSet)) {
-            DateRange range = PrimitiveDateExtractor.extract(p);
-            if (range.isUnparseable()) unparseable++;
-            Tier t = Classifier.classify(range, window);
-            // Tagless primitives (corner nodes of buildings, segments of a
-            // multipolygon outer, etc.) only render as part of a parent
-            // way/relation. Seed them as FAINT and rely on propagation to
-            // lift them — otherwise the no-tags-means-always-present default
-            // leaves them visible even when their parent is hidden.
-            if (!p.hasKeys() && t == Tier.BRIGHT) {
-                t = Tier.FAINT;
-            }
-            long key = PrimitiveKey.of(p);
-            byId.put(key, t);
-            // Track primitives that carry their own date tags so
-            // propagation doesn't override their classification. Critical
-            // for chronology relations: their child boundary relations are
-            // independently date-tagged, and the chronology's wide range
-            // shouldn't promote them.
-            if (p.hasKey("start_date") || p.hasKey("end_date")) {
-                hasOwnDateTags.add(key);
-            }
-        }
-
-        // Order matters: relation->member promotion first (so a way inherits
-        // its multipolygon's tier before its own nodes inherit from it), then
-        // way->node promotion.
-        RelationPropagator.propagate(dataSet.getRelations(), byId, hasOwnDateTags);
-        WayNodePropagator.propagate(dataSet.getWays(), byId, hasOwnDateTags);
-
-        // Pre-count and publish the cache before mutating flags / triggering
-        // repaint, so OhmTierStyleSource.apply sees the new tier assignments
-        // on the very first paint pass that follows.
-        int bright = 0, normal = 0, faint = 0;
-        for (Tier t : byId.values()) {
-            switch (t) {
-                case BRIGHT: bright++; break;
-                case NORMAL: normal++; break;
-                case FAINT: faint++; break;
-            }
-        }
-        ClassificationCache cache = new ClassificationCache(byId, bright, normal, faint, unparseable);
-        ClassificationCache.set(cache);
-
-        // Mutate per-primitive flags. Only FAINT gets touched (set
-        // disabled+hidden); NORMAL stays selectable and receives its
-        // visual fade through the registered MapPaint style.
         List<OsmPrimitive> deselect = new ArrayList<>();
+        ClassificationCache cache;
+
         dataSet.beginUpdate();
         try {
+            for (OsmPrimitive p : iterateAll(dataSet)) {
+                DateRange range = PrimitiveDateExtractor.extract(p);
+                if (range.isUnparseable()) unparseable++;
+                Tier t = Classifier.classify(range, window);
+                // Tagless primitives (corner nodes of buildings, segments of
+                // a multipolygon outer, etc.) only render as part of a parent
+                // way/relation. Seed them as FAINT and rely on propagation to
+                // lift them — otherwise the no-tags-means-always-present
+                // default leaves them visible even when their parent is
+                // hidden.
+                if (!p.hasKeys() && t == Tier.BRIGHT) {
+                    t = Tier.FAINT;
+                }
+                long key = PrimitiveKey.of(p);
+                byId.put(key, t);
+                // Track primitives that carry their own date tags so
+                // propagation doesn't override their classification.
+                // Critical for chronology relations: their child boundary
+                // relations are independently date-tagged, and the
+                // chronology's wide range shouldn't promote them.
+                if (p.hasKey("start_date") || p.hasKey("end_date")) {
+                    hasOwnDateTags.add(key);
+                }
+            }
+
+            // Order matters: relation->member promotion first (so a way
+            // inherits its multipolygon's tier before its own nodes inherit
+            // from it), then way->node promotion.
+            RelationPropagator.propagate(dataSet.getRelations(), byId, hasOwnDateTags);
+            WayNodePropagator.propagate(dataSet.getWays(), byId, hasOwnDateTags);
+
+            // Pre-count and publish the cache before mutating flags so
+            // OhmTierStyleSource.apply sees the new tier assignments on the
+            // very first paint pass that follows.
+            int bright = 0, normal = 0, faint = 0;
+            for (Tier t : byId.values()) {
+                switch (t) {
+                    case BRIGHT: bright++; break;
+                    case NORMAL: normal++; break;
+                    case FAINT:  faint++;  break;
+                }
+            }
+            cache = new ClassificationCache(byId, bright, normal, faint, unparseable);
+            ClassificationCache.set(cache);
+
+            // Mutate per-primitive flags. Only FAINT gets touched (set
+            // disabled+hidden); NORMAL stays selectable and receives its
+            // visual fade through the registered MapPaint style.
             for (OsmPrimitive p : iterateAll(dataSet)) {
                 Tier t = byId.getOrDefault(PrimitiveKey.of(p), Tier.FAINT);
                 if (t == Tier.FAINT && !p.isDisabledAndHidden()) {

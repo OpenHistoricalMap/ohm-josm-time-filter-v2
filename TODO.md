@@ -1,87 +1,90 @@
 # TODO
 
-Open items, roughly in order of value. Sorted into "ought to do soon" and
-"someday / nice to have".
+Open items, with the bigger pass of follow-up work already done. The
+items below are either deferred (waiting on user or external action) or
+research-grade (worth doing, low immediate ROI).
 
-## Code improvements (worth doing)
+## Deferred — needs user / host action
 
-### Shift-button definitions are 10 explicit calls
+### Move README screenshot in-repo
 
-`TimeFilterDialog.buildShiftButtonRow()` repeats `makeShiftButton(...)`
-ten times. A small `record (label, tooltip, ΔY, ΔM, ΔD)` array iterated in
-a loop would be tighter and cheaper to extend. Marginal.
+The README's preview image is a `https://github.com/user-attachments/...`
+URL. The file isn't reachable from this sandbox (likely auth-gated). To
+move it in-repo:
 
-### Spinner shortcut-disable trampoline is a hack
-
-The offset spinner's shortcut-safe focus listener (`TimeFilterDialog`,
-"shortcutTrampoline") forwards focus events to a hidden
-`DisableShortcutsOnFocusGainedTextField`. Works, but a clean version
-would subclass `JFormattedTextField` to implement
-`DisableShortcutsOnFocusGainedComponent` directly and use it as the
-spinner's editor's text field.
-
-### Verify worker-thread flag mutation is concurrency-safe
-
-`TimeFilterController.classifyAndApply` calls `p.setDisabledState(...)`
-from `MainApplication.worker` (not the EDT). JOSM's primitives use
-internal write locks, so it should be safe, but worth confirming under a
-concurrent edit (e.g., user dragging a node while a re-classify runs).
-
-### Tooltip / docs for partial-date set point semantics
-
-`OhmDate.pointEpochDay()` resolves a partial date like `1900` to its
-*earliest* day (Jan 1 1900). A user typing `1900` and expecting "any
-time in 1900" might be surprised that an object with `start_date=1900-12`
-isn't considered "on this day" for set point `1900`. Either widen the
-filter date tooltip with an example or document explicitly in the README.
-
-## Future / nice-to-have
-
-### Integration test for the full controller pipeline
-
-The propagators, `Classifier`, `OhmDate`, and `DateParser` all have unit
-tests. `TimeFilterController` does not, because it pulls in JOSM's static
-init (which the project's tests deliberately avoid). A test that parses a
-small `.osm` fixture by hand and runs `classifyAndApply` end-to-end would
-catch regressions across the whole pipeline. Could live in a separate
-`test/integration/` source set.
-
-### Performance profiling on large layers
-
-Each `Apply` (and each shift-button click) iterates every primitive,
-classifies, and sets flags. On the 158 MB `test_chronologies.osm` fixture
-this is tens of thousands of primitives per click. Async on the worker so
-it doesn't block the EDT, but worth profiling to know the floor and
-ceiling of responsiveness.
-
-### Selection restoration on Clear
-
-Primitives the filter hides (FAINT) are deselected during `classifyAndApply`.
-After Clear, they're not re-selected. Snapshot the original selection
-before Apply and restore on Clear, if it makes sense as a UX.
-
-### Bundled dialog icon
-
-`resources/images/dialogs/timefilter.svg` is a placeholder I made when
-the plugin first refused to load without one. The user-provided icons
-under `resources/images/ohmtimefilter/` are much nicer. Either reuse one
-of those or commission a dedicated dialog icon.
+```sh
+# On a machine with access to your GitHub session:
+mkdir -p docs
+curl -L -o docs/screenshot.png 'https://github.com/user-attachments/assets/405c244f-34fb-4071-8a97-2ad112d28ce0'
+# Then in README.md, replace the <img src="..."> URL with: docs/screenshot.png
+git add docs/screenshot.png README.md
+git commit -m "Move README screenshot in-repo"
+```
 
 ### i18n translation files
 
-All user-facing strings already pass through `tr()` so the code is
-translation-ready, but no `.lang` / `.po` toolchain exists. Adding
-translations would require setting up the JOSM i18n pipeline.
+All user-facing strings already pass through `tr(...)` so the code is
+translation-ready. There's no `.lang` / `.po` toolchain yet, and setting
+one up preemptively (without a translator interested) is sunk cost.
 
-### README screenshot is hosted off-repo
+When a translator turns up:
 
-The README's preview image is a Monosnap-uploaded URL. If the host
-disappears the image breaks. Move to a repo-hosted file under `docs/` or
-similar.
+1. Generate a POT template by extracting strings from source. JOSM core's
+   `i18n.xml` Ant target does this for core; we'd want a parallel target
+   in our `build.xml` calling `xgettext` over `src/`.
+2. Translators contribute `<lang>.po` files under `data/` or `i18n/`.
+3. Compile to `.mo` and bundle in the jar at `data/<lang>.mo`.
+4. JOSM's runtime auto-picks the right `.mo` based on the user's locale.
 
-### Investigate JOSM's mid-session plugin disable behaviour
+Start with a single language (e.g. `de.po`) before generalising the
+build pipeline.
 
-`TimeFilterPlugin`'s class javadoc explains why we have no `Plugin.destroy`
-hook (JOSM doesn't expose one and disable-via-prefs requires a restart).
-Worth confirming that's true in current JOSM, and whether any newer
-hooks have been added that would let us clean up more proactively.
+## Research / observe
+
+### Profile on real OHM data
+
+Synthetic micro-bench (`PipelinePerformanceTest`) puts 100k primitives +
+1k relations + 30k ways at ~300 ms total wall-time on a developer
+laptop, well under the felt-instant threshold. The real test is JOSM
++ `test_chronologies.osm` (158 MB, ~1.5M primitives), which hits the
+JOSM-types adapter overhead the micro-bench doesn't measure. Worth
+running once and recording the number; if it's >1 second per Apply, the
+shift-button-spam UX would feel laggy and we'd want to look at:
+
+- Caching `start_date`/`end_date` parses per-tag-string (lots of repeats
+  in chronology data — every member of a chronology often shares the
+  same dates with its siblings).
+- Skipping primitives that haven't changed since the last classify.
+- Splitting classification across multiple worker threads.
+
+### Confirm worker-thread iteration is genuinely safe under concurrent edit
+
+The classify-then-mutate loop is now wrapped in
+`dataSet.beginUpdate()` / `endUpdate()`, matching JOSM's own
+`FilterModel.executeFilters` pattern. That should be enough — JOSM's
+own filter dialog has used this for years without reported races — but
+worth a manual stress test (drag a node continuously while Apply
+fires) before claiming this is bulletproof.
+
+## Done in this pass
+
+- ~~Shift-button definitions consolidated into a static `Shift[]` array,
+  iterated in `buildShiftButtonRow`~~
+- ~~Spinner shortcut-disable trampoline extracted into
+  `ShortcutSafeFocus.installOn(JTextField)`~~
+- ~~`classifyAndApply` wrapped in `beginUpdate()`/`endUpdate()` for
+  thread-safe iteration~~
+- ~~Date-field tooltip explains partial-date resolution~~
+- ~~Selection restoration on Clear (`preFilterSelection` snapshot
+  taken on first Apply, restored on Clear, dead primitives skipped)~~
+- ~~Bundled dialog icon redrawn as a clock-in-funnel matching the
+  user-provided icon palette~~
+- ~~End-to-end integration test (`IntegrationPipelineTest`) covers
+  multipolygon-outer lift, chronology non-lift, paint-shop FAINT
+  cascade, boundary inclusivity, tagged-node-with-own-dates
+  authority, and `PrimitiveKey` collision~~
+- ~~Synthetic perf benchmark (`PipelinePerformanceTest`) — 100k prims +
+  1k rels + 30k ways in ~300 ms~~
+- ~~Mid-session disable lifecycle confirmed (`Plugin.java` has no
+  `destroy()` hook); rationale documented in `TimeFilterPlugin`
+  class javadoc~~

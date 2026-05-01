@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Plugin dialog icon: a funnel (filter) overlaid with a small clock face
+  to mark this as the *time* filter. Matches the style of the funnel
+  icons under resources/images/ohmtimefilter/ for visual consistency.
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <circle cx="12" cy="12" r="10" fill="none" stroke="#2b6cb0" stroke-width="2"/>
-  <line x1="12" y1="12" x2="12" y2="6" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round"/>
-  <line x1="12" y1="12" x2="16" y2="14" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round"/>
+  <!-- Funnel outline -->
+  <path d="M 4 4 L 20 4 Q 21 4 20.4 4.8 L 14.2 13 Q 13.7 13.7 13.7 14.4 L 13.7 20 Q 13.7 21 12.7 21 L 11.3 21 Q 10.3 21 10.3 20 L 10.3 14.4 Q 10.3 13.7 9.8 13 L 3.6 4.8 Q 3 4 4 4 Z"
+        fill="#2b6cb0" stroke="#2b6cb0" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Clock face nestled at the funnel's mouth -->
+  <circle cx="17.5" cy="17.5" r="4.2" fill="white" stroke="#2b6cb0" stroke-width="1.2"/>
+  <line x1="17.5" y1="17.5" x2="17.5" y2="14.6" stroke="#2b6cb0" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="17.5" y1="17.5" x2="19.7" y2="18.8" stroke="#2b6cb0" stroke-width="1.2" stroke-linecap="round"/>
 </svg>

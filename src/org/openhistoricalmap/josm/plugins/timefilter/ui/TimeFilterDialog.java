@@ -10,8 +10,6 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -99,7 +97,9 @@ public final class TimeFilterDialog extends ToggleDialog {
         setPointField = new DisableShortcutsOnFocusGainedTextField(
                 TimeFilterPreferences.loadSetPoint(DEFAULT_SET_POINT));
         setPointField.setColumns(8);
-        setPointField.setToolTipText(tr("YYYY, YYYY-MM, or YYYY-MM-DD. Negative years allowed (e.g. -0044-03-15)."));
+        setPointField.setToolTipText(tr(
+                "YYYY, YYYY-MM, or YYYY-MM-DD. Negative years allowed (e.g. -0044-03-15). " +
+                "Partial dates resolve to their earliest day — \"1900\" means 1900-01-01."));
         normalBorderColor = setPointField.getBackground();
 
         SpinnerNumberModel offsetModel = new SpinnerNumberModel(
@@ -112,18 +112,7 @@ public final class TimeFilterDialog extends ToggleDialog {
         ((NumberFormatter) tf.getFormatter()).setAllowsInvalid(false);
         tf.setColumns(3);
         offsetSpinner.setToolTipText(tr("Days on each side of the filter date (default 0)."));
-        // Same shortcut-disable trick used for the date field: while the
-        // spinner editor has focus, unregister JOSM's plain-key shortcuts
-        // so typing "1" inserts a digit instead of triggering, e.g., zoom.
-        // We trampoline through a hidden DisableShortcutsOnFocusGainedTextField
-        // because that class is a Component, which is what the interface's
-        // hasToBeDisabled probe requires.
-        final DisableShortcutsOnFocusGainedTextField shortcutTrampoline =
-                new DisableShortcutsOnFocusGainedTextField();
-        tf.addFocusListener(new FocusListener() {
-            @Override public void focusGained(FocusEvent e) { shortcutTrampoline.focusGained(e); }
-            @Override public void focusLost(FocusEvent e) { shortcutTrampoline.focusLost(e); }
-        });
+        ShortcutSafeFocus.installOn(tf);
 
         Icon fsIcon = new ImageProvider("ohmtimefilter/set-filter-by-selection")
                 .setSize(new Dimension(20, 20)).get();
@@ -200,19 +189,42 @@ public final class TimeFilterDialog extends ToggleDialog {
                 .show();
     }
 
+    /** Definition of one date-shift button (label + tooltip + Δ-tuple). */
+    private static final class Shift {
+        final String label;
+        final String tooltip;
+        final int years, months, days;
+        Shift(String label, String tooltip, int y, int m, int d) {
+            this.label = label; this.tooltip = tooltip;
+            this.years = y; this.months = m; this.days = d;
+        }
+    }
+
+    /** Backward and forward groups, each in display order. */
+    private static final Shift[] BACK_SHIFTS = {
+        new Shift("<C", "Back 100 years", -100, 0, 0),
+        new Shift("<X", "Back 10 years",  -10,  0, 0),
+        new Shift("<Y", "Back 1 year",     -1,  0, 0),
+        new Shift("<M", "Back 1 month",     0, -1, 0),
+        new Shift("<D", "Back 1 day",       0,  0, -1),
+    };
+    private static final Shift[] FORWARD_SHIFTS = {
+        new Shift("D>", "Forward 1 day",    0,  0, 1),
+        new Shift("M>", "Forward 1 month",  0,  1, 0),
+        new Shift("Y>", "Forward 1 year",   1,  0, 0),
+        new Shift("X>", "Forward 10 years", 10, 0, 0),
+        new Shift("C>", "Forward 100 years",100,0, 0),
+    };
+
     private JPanel buildShiftButtonRow() {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
-        row.add(makeShiftButton("<C", tr("Back 100 years"), -100, 0, 0));
-        row.add(makeShiftButton("<X", tr("Back 10 years"), -10, 0, 0));
-        row.add(makeShiftButton("<Y", tr("Back 1 year"), -1, 0, 0));
-        row.add(makeShiftButton("<M", tr("Back 1 month"), 0, -1, 0));
-        row.add(makeShiftButton("<D", tr("Back 1 day"), 0, 0, -1));
+        for (Shift s : BACK_SHIFTS) {
+            row.add(makeShiftButton(s.label, tr(s.tooltip), s.years, s.months, s.days));
+        }
         row.add(javax.swing.Box.createHorizontalStrut(6));
-        row.add(makeShiftButton("D>", tr("Forward 1 day"), 0, 0, 1));
-        row.add(makeShiftButton("M>", tr("Forward 1 month"), 0, 1, 0));
-        row.add(makeShiftButton("Y>", tr("Forward 1 year"), 1, 0, 0));
-        row.add(makeShiftButton("X>", tr("Forward 10 years"), 10, 0, 0));
-        row.add(makeShiftButton("C>", tr("Forward 100 years"), 100, 0, 0));
+        for (Shift s : FORWARD_SHIFTS) {
+            row.add(makeShiftButton(s.label, tr(s.tooltip), s.years, s.months, s.days));
+        }
         return row;
     }
 
