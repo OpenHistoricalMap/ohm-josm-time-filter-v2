@@ -1,4 +1,4 @@
-# ohm-josm-time-filter-v2: A JOSM OHM Time Filter
+# OHM_Time_Filter — an OpenHistoricalMap time filter plugin for JOSM
 
 A JOSM plugin for [OpenHistoricalMap](https://www.openhistoricalmap.org/)
 that highlights features existing at a chosen date and fades or hides the rest.
