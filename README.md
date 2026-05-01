@@ -17,10 +17,11 @@ Objects that exist:
 - **Inside the time window** — are visible but muted & still selectable.
 - **Outside of the time window** — are hidden from view, but are still in the dataset, selection is cleared.
 
-A row of date-shift buttons (`<C` `<X` `<Y` `<M` `<D` … `D>` `M>` `Y>` `X>` `C>`)
-lets you scrub backward and forward by century / decade / year / month / day,
-re-applying the filter as you go. A separate "Filter to Selection" button
-picks a focus date by averaging the selected primitives' dates and applies it.
+Two chevron-shaped groups of buttons — one pointing backward, one
+pointing forward — let you scrub the filter date by century / decade /
+year / month / day (`100Y`, `10Y`, `Y`, `M`, `D`), re-applying the
+filter on each click. A separate "Filter to Selection" button picks a
+focus date by averaging the selected primitives' dates and applies it.
 
 The plugin composes with JOSM's built-in Filter dialog: the time filter only
 ever *escalates* primitive visibility (an item already hidden by a JOSM tag
@@ -31,10 +32,17 @@ filter stays hidden), it never reveals.
 - JOSM **r19439** or later.
 - Java **17** or later.
 
+## Download
+
+Pre-built jars are attached to each
+[GitHub release](https://github.com/OpenHistoricalMap/ohm-josm-time-filter-v2/releases).
+Grab the latest `OHM_Time_Filter.jar` from there if you don't want to
+build from source.
+
 ## Install
 
-Build the jar (see below) and copy `dist/OHM_Time_Filter.jar` into your JOSM
-plugins directory:
+Drop `OHM_Time_Filter.jar` (downloaded from a release, or built locally
+per the instructions below) into your JOSM plugins directory:
 
 - macOS: `~/Library/JOSM/plugins/`
 - Linux: `~/.config/JOSM/plugins/` or `~/.local/share/JOSM/plugins/`

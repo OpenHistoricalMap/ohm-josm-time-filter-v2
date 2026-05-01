@@ -92,7 +92,7 @@ ships with dist/josm-custom.jar prebuilt).
                 <attribute name="Plugin-Class"        value="${plugin.class}"/>
                 <attribute name="Plugin-Description"  value="${plugin.description}"/>
                 <attribute name="Plugin-Mainversion"  value="${plugin.main.version}"/>
-                <attribute name="Plugin-Version"      value="0.1.0"/>
+                <attribute name="Plugin-Version"      value="0.2.0"/>
                 <attribute name="Plugin-Icon"         value="${plugin.icon}"/>
                 <attribute name="Plugin-Link"         value="${plugin.link}"/>
                 <attribute name="Plugin-Canloadatruntime" value="${plugin.canloadatruntime}"/>
