@@ -20,17 +20,25 @@ esac
 
 TRAILER="Co-Authored-By: Claude <noreply@anthropic.com>"
 
-# Already present (perhaps from the template, an amend, or manual entry)?
+# Refuse to "enrich" an empty message. Otherwise git would promote the
+# trailer line to a commit subject, leaving a stub with no real text.
+# A line counts as content if it's not a git-comment (starts with #) and
+# not just whitespace. The `! grep` trick: exit early when grep finds no
+# qualifying line.
+if ! grep -v -E '^(#|[[:space:]]*$)' "$COMMIT_MSG_FILE" >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Already present (template, amend, or manual entry)? Nothing to do.
 if grep -qF "$TRAILER" "$COMMIT_MSG_FILE"; then
     exit 0
 fi
 
-# Strip a single trailing newline if present, then append a blank line +
-# the trailer. This keeps the trailer block tidy whether the message
-# ends with a newline or not.
+# Append trailer with a blank line separator. Pure cat + printf — no sed
+# pattern syntax to worry about across BSD vs GNU.
 TMP="$(mktemp)"
 {
-    sed -e '$ {/^$/d}' "$COMMIT_MSG_FILE"
+    cat "$COMMIT_MSG_FILE"
     printf '\n%s\n' "$TRAILER"
 } > "$TMP"
 mv "$TMP" "$COMMIT_MSG_FILE"

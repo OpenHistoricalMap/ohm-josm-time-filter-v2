@@ -6,21 +6,6 @@ research-grade (worth doing, low immediate ROI).
 
 ## Deferred — needs user / host action
 
-### Move README screenshot in-repo
-
-The README's preview image is a `https://github.com/user-attachments/...`
-URL. The file isn't reachable from this sandbox (likely auth-gated). To
-move it in-repo:
-
-```sh
-# On a machine with access to your GitHub session:
-mkdir -p docs
-curl -L -o docs/screenshot.png 'https://github.com/user-attachments/assets/405c244f-34fb-4071-8a97-2ad112d28ce0'
-# Then in README.md, replace the <img src="..."> URL with: docs/screenshot.png
-git add docs/screenshot.png README.md
-git commit -m "Move README screenshot in-repo"
-```
-
 ### i18n translation files
 
 All user-facing strings already pass through `tr(...)` so the code is
@@ -88,3 +73,5 @@ fires) before claiming this is bulletproof.
 - ~~Mid-session disable lifecycle confirmed (`Plugin.java` has no
   `destroy()` hook); rationale documented in `TimeFilterPlugin`
   class javadoc~~
+- ~~README screenshot moved in-repo (`docs/screenshot.png`); README's
+  `<img src>` now points at the relative path~~
