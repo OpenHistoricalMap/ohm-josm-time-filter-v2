@@ -189,55 +189,69 @@ public final class TimeFilterDialog extends ToggleDialog {
                 .show();
     }
 
-    /** Definition of one date-shift button (label + tooltip + Δ-tuple). */
-    private static final class Shift {
-        final String label;
-        final String tooltip;
-        final int years, months, days;
-        Shift(String label, String tooltip, int y, int m, int d) {
-            this.label = label; this.tooltip = tooltip;
-            this.years = y; this.months = m; this.days = d;
+    /**
+     * One step magnitude (icon + unit-name + absolute Δ-tuple). The
+     * direction (-1 for back, +1 for forward) is supplied by
+     * {@link #makeShiftButton}.
+     */
+    private static final class Magnitude {
+        final String iconName;
+        final String unit;
+        final int absYears, absMonths, absDays;
+        Magnitude(String iconName, String unit, int y, int m, int d) {
+            this.iconName = iconName; this.unit = unit;
+            this.absYears = y; this.absMonths = m; this.absDays = d;
         }
     }
 
-    /** Backward and forward groups, each in display order. */
-    private static final Shift[] BACK_SHIFTS = {
-        new Shift("<C", "Back 100 years", -100, 0, 0),
-        new Shift("<X", "Back 10 years",  -10,  0, 0),
-        new Shift("<Y", "Back 1 year",     -1,  0, 0),
-        new Shift("<M", "Back 1 month",     0, -1, 0),
-        new Shift("<D", "Back 1 day",       0,  0, -1),
-    };
-    private static final Shift[] FORWARD_SHIFTS = {
-        new Shift("D>", "Forward 1 day",    0,  0, 1),
-        new Shift("M>", "Forward 1 month",  0,  1, 0),
-        new Shift("Y>", "Forward 1 year",   1,  0, 0),
-        new Shift("X>", "Forward 10 years", 10, 0, 0),
-        new Shift("C>", "Forward 100 years",100,0, 0),
+    /**
+     * Step magnitudes in descending order (largest jump first). The back
+     * group displays them in this order (100Y nearest the left arrow
+     * point); the forward group displays them reversed (100Y nearest the
+     * right arrow point).
+     */
+    private static final Magnitude[] MAGNITUDES = {
+        new Magnitude("ohmtimefilter/timeline-100y", "100 years", 100, 0, 0),
+        new Magnitude("ohmtimefilter/timeline-10y",  "10 years",  10,  0, 0),
+        new Magnitude("ohmtimefilter/timeline-y",    "1 year",    1,   0, 0),
+        new Magnitude("ohmtimefilter/timeline-m",    "1 month",   0,   1, 0),
+        new Magnitude("ohmtimefilter/timeline-d",    "1 day",     0,   0, 1),
     };
 
+    private static final Dimension SHIFT_BTN_SIZE = new Dimension(32, 26);
+
     private JPanel buildShiftButtonRow() {
-        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
-        for (Shift s : BACK_SHIFTS) {
-            row.add(makeShiftButton(s.label, tr(s.tooltip), s.years, s.months, s.days));
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+
+        ShiftButtonGroup back = new ShiftButtonGroup("ohmtimefilter/group-back");
+        for (Magnitude m : MAGNITUDES) {
+            back.add(makeShiftButton(m, -1));
         }
-        row.add(javax.swing.Box.createHorizontalStrut(6));
-        for (Shift s : FORWARD_SHIFTS) {
-            row.add(makeShiftButton(s.label, tr(s.tooltip), s.years, s.months, s.days));
+        row.add(back);
+
+        ShiftButtonGroup forward = new ShiftButtonGroup("ohmtimefilter/group-fwd");
+        for (int i = MAGNITUDES.length - 1; i >= 0; i--) {
+            forward.add(makeShiftButton(MAGNITUDES[i], +1));
         }
+        row.add(forward);
+
         return row;
     }
 
-    private JButton makeShiftButton(String label, String tooltip, int years, int months, int days) {
-        JButton b = new JButton(label);
-        b.setToolTipText(tooltip);
+    private JButton makeShiftButton(Magnitude m, int direction) {
+        Icon icon = new ImageProvider(m.iconName).setSize(SHIFT_BTN_SIZE).get();
+        JButton b = new JButton(icon);
+        b.setToolTipText(direction < 0
+                ? tr("Back {0}", m.unit)
+                : tr("Forward {0}", m.unit));
         b.setMargin(new Insets(0, 0, 0, 0));
         b.setFocusable(false);
-        // Compact square-ish button — keeps a 10-button row from sprawling.
-        Dimension size = new Dimension(32, 26);
-        b.setPreferredSize(size);
-        b.setMinimumSize(size);
-        b.setMaximumSize(size);
+        b.setPreferredSize(SHIFT_BTN_SIZE);
+        b.setMinimumSize(SHIFT_BTN_SIZE);
+        b.setMaximumSize(SHIFT_BTN_SIZE);
+        int years = direction * m.absYears;
+        int months = direction * m.absMonths;
+        int days = direction * m.absDays;
         b.addActionListener(e -> shiftDate(years, months, days));
         return b;
     }
