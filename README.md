@@ -3,7 +3,7 @@
 A JOSM plugin for [OpenHistoricalMap](https://www.openhistoricalmap.org/)
 that highlights features existing at a chosen date and fades or hides the rest.
 
-<img width="580" height="127" alt="Screenshot of the OHM Time Filter JOSM plugin" src="docs/screenshot.png" />
+<img width="580" height="127" alt="Screenshot of the OHM Time Filter JOSM plugin" src="docs/josm-ohm_time_filter-panel-ui.png" />
 
 This is kind of like a timeslider without, you know, the slider thing.
 
@@ -27,19 +27,26 @@ The plugin composes with JOSM's built-in Filter dialog: the time filter only
 ever *escalates* primitive visibility (an item already hidden by a JOSM tag
 filter stays hidden), it never reveals.
 
-## Requirements
+Here's [a block in Seattle](https://www.openhistoricalmap.org/#map=17/47.603384/-122.333037&layers=O&date=1865-01-12&daterange=1000-01-01,2026-12-31) with data from multiple Sanborn maps and no filter applied:
+<img alt="JOSM view with no filter applied" src="docs/filter-before.png" />
 
-- JOSM **r19439** or later.
-- Java **17** or later.
+Here's the same block set to the day before [the Great Seattle Fire](https://en.wikipedia.org/wiki/Great_Seattle_Fire).
+<img alt="Same JOSM view with no a single date applied" src="docs/filter-1.png" />
 
-## Download
+Here's the same block 1 year later, set by pressing the Y> button.
+<img alt="Same JOSM view after pressing the Y> button" src="docs/filter-2.png" />
+
+## Installation
+
+### From JOSM settings/preferences Plugin panel (recommended)
+<img alt="JOSM plugin installation panel showing OHM_Time_Filter" src="docs/josm-plugin-install.png" />
+
+### From release .jar
 
 Pre-built jars are attached to each
 [GitHub release](https://github.com/OpenHistoricalMap/ohm-josm-time-filter-v2/releases).
 Grab the latest `OHM_Time_Filter.jar` from there if you don't want to
 build from source.
-
-## Install
 
 Drop `OHM_Time_Filter.jar` (downloaded from a release, or built locally
 per the instructions below) into your JOSM plugins directory:
@@ -50,8 +57,13 @@ per the instructions below) into your JOSM plugins directory:
 
 Then enable the plugin in **Preferences → Plugins**.
 
-## Build
+### From source
 
+#### Requirements:
+- JOSM **r19439** or later.
+- Java **17** or later.
+
+#### Build: 
 The plugin compiles directly against a JOSM core jar — no Ivy / Maven needed.
 
 ```sh
@@ -72,7 +84,7 @@ ant runjosm
 The build pins to the revision of `core/` you have checked out; bumping
 `core/` requires bumping `plugin.main.version` in `build.xml`.
 
-## Project layout
+#### Project layout:
 
 ```
 src/                    Plugin source (org.openhistoricalmap.josm.plugins.timefilter)
