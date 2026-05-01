@@ -120,18 +120,25 @@ public final class TimeFilterDialog extends ToggleDialog {
         fsBtn.setToolTipText(tr("Filter to selection: average the selected primitives' dates and apply."));
         fsBtn.setMargin(new Insets(2, 4, 2, 4));
 
-        // Row 0: filter date + ± offset + FS
+        // Row 0: date controls hugging the left, FS button hugging the
+        // right (so it visually lines up near the right edge of the
+        // forward-shift chevron group below it). BorderLayout WEST/EAST
+        // gives WEST its preferred width, EAST its preferred width, and
+        // lets CENTER absorb the gap in the middle.
         g.gridx = 0; g.gridy = 0; g.gridwidth = 2;
-        g.fill = GridBagConstraints.NONE; g.anchor = GridBagConstraints.WEST;
-        JPanel topRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-        topRow.add(new JLabel(tr("Filter date")));
-        topRow.add(setPointField);
-        topRow.add(new JLabel("±"));
-        topRow.add(offsetSpinner);
-        topRow.add(new JLabel(tr("days")));
-        topRow.add(javax.swing.Box.createHorizontalStrut(4));
-        topRow.add(fsBtn);
+        g.fill = GridBagConstraints.HORIZONTAL; g.weightx = 1;
+        g.anchor = GridBagConstraints.WEST;
+        JPanel topRow = new JPanel(new BorderLayout());
+        JPanel topLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        topLeft.add(new JLabel(tr("Filter date")));
+        topLeft.add(setPointField);
+        topLeft.add(new JLabel("±"));
+        topLeft.add(offsetSpinner);
+        topLeft.add(new JLabel(tr("days")));
+        topRow.add(topLeft, BorderLayout.WEST);
+        topRow.add(fsBtn, BorderLayout.EAST);
         form.add(topRow, g);
+        g.weightx = 0;  // reset so subsequent rows aren't pushed
 
         // Row 1: date-shift buttons
         g.gridx = 0; g.gridy = 1; g.gridwidth = 2;
@@ -190,16 +197,17 @@ public final class TimeFilterDialog extends ToggleDialog {
     }
 
     /**
-     * One step magnitude (icon + unit-name + absolute Δ-tuple). The
-     * direction (-1 for back, +1 for forward) is supplied by
-     * {@link #makeShiftButton}.
+     * One step magnitude (text label, unit name for tooltips, button
+     * width, absolute Δ-tuple). The direction (-1 for back, +1 for
+     * forward) is supplied by {@link #makeShiftButton}.
      */
     private static final class Magnitude {
-        final String iconName;
+        final String label;
         final String unit;
+        final int buttonWidth;
         final int absYears, absMonths, absDays;
-        Magnitude(String iconName, String unit, int y, int m, int d) {
-            this.iconName = iconName; this.unit = unit;
+        Magnitude(String label, String unit, int width, int y, int m, int d) {
+            this.label = label; this.unit = unit; this.buttonWidth = width;
             this.absYears = y; this.absMonths = m; this.absDays = d;
         }
     }
@@ -208,17 +216,19 @@ public final class TimeFilterDialog extends ToggleDialog {
      * Step magnitudes in descending order (largest jump first). The back
      * group displays them in this order (100Y nearest the left arrow
      * point); the forward group displays them reversed (100Y nearest the
-     * right arrow point).
+     * right arrow point). Per-magnitude widths give the multi-character
+     * labels more room and let the single-character labels feel less
+     * empty.
      */
     private static final Magnitude[] MAGNITUDES = {
-        new Magnitude("ohmtimefilter/timeline-100y", "100 years", 100, 0, 0),
-        new Magnitude("ohmtimefilter/timeline-10y",  "10 years",  10,  0, 0),
-        new Magnitude("ohmtimefilter/timeline-y",    "1 year",    1,   0, 0),
-        new Magnitude("ohmtimefilter/timeline-m",    "1 month",   0,   1, 0),
-        new Magnitude("ohmtimefilter/timeline-d",    "1 day",     0,   0, 1),
+        new Magnitude("100Y", "100 years", 40, 100, 0, 0),
+        new Magnitude("10Y",  "10 years",  32,  10, 0, 0),
+        new Magnitude("Y",    "1 year",    22,   1, 0, 0),
+        new Magnitude("M",    "1 month",   22,   0, 1, 0),
+        new Magnitude("D",    "1 day",     22,   0, 0, 1),
     };
 
-    private static final Dimension SHIFT_BTN_SIZE = new Dimension(32, 26);
+    private static final int SHIFT_BTN_HEIGHT = 26;
 
     private JPanel buildShiftButtonRow() {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
@@ -239,16 +249,17 @@ public final class TimeFilterDialog extends ToggleDialog {
     }
 
     private JButton makeShiftButton(Magnitude m, int direction) {
-        Icon icon = new ImageProvider(m.iconName).setSize(SHIFT_BTN_SIZE).get();
-        JButton b = new JButton(icon);
+        JButton b = new JButton(m.label);
         b.setToolTipText(direction < 0
                 ? tr("Back {0}", m.unit)
                 : tr("Forward {0}", m.unit));
-        b.setMargin(new Insets(0, 0, 0, 0));
+        b.setFont(b.getFont().deriveFont(java.awt.Font.BOLD, 11f));
+        b.setMargin(new Insets(0, 2, 0, 2));
         b.setFocusable(false);
-        b.setPreferredSize(SHIFT_BTN_SIZE);
-        b.setMinimumSize(SHIFT_BTN_SIZE);
-        b.setMaximumSize(SHIFT_BTN_SIZE);
+        Dimension size = new Dimension(m.buttonWidth, SHIFT_BTN_HEIGHT);
+        b.setPreferredSize(size);
+        b.setMinimumSize(size);
+        b.setMaximumSize(size);
         int years = direction * m.absYears;
         int months = direction * m.absMonths;
         int days = direction * m.absDays;
