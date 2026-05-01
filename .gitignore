@@ -16,11 +16,6 @@ test/results.txt
 test_osm_data.osm
 test/test_*.osm
 
-# Stray screenshots / one-off images outside resources/
-selection-icon.png
-*.png
-!resources/**/*.png
-
 # macOS
 .DS_Store
 ._*
