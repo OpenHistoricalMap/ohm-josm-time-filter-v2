@@ -23,6 +23,14 @@ import org.openstreetmap.josm.plugins.PluginInformation;
  *   - Construction: {@link StyleRegistration#cleanupStalePrefs()} runs
  *     to strip any phantom row in {@code mappaint.style.entries} from a
  *     previous session that didn't get a chance to detach.
+ *   - The {@link TimeFilterDialog} is rebuilt on every map-frame
+ *     transition into a non-null frame. JOSM destroys a {@code
+ *     ToggleDialog}'s internal title-bar when the owning MapFrame is
+ *     closed, so the same dialog instance can't simply be re-docked
+ *     in a freshly-created MapFrame: {@code ToggleDialog.dock()} would
+ *     trip an NPE on {@code titleBar.setVisible(...)}. The controller
+ *     (and its prefs / classification cache) persists across these
+ *     transitions; only the UI shell needs to be reconstructed.
  *   - Shutdown: JOSM has no {@code Plugin.destroy()} hook. We use the
  *     final map-frame transition ({@code mapFrameInitialized(_, null)})
  *     as our shutdown signal — it fires when the last layer is closed
@@ -40,8 +48,9 @@ import org.openstreetmap.josm.plugins.PluginInformation;
 public class TimeFilterPlugin extends Plugin {
 
     private final TimeFilterController controller;
-    private final TimeFilterDialog dialog;
     private final DataLayerListener layerListener;
+    /** Rebuilt on every transition into a fresh MapFrame; {@code null} between. */
+    private TimeFilterDialog dialog;
 
     public TimeFilterPlugin(PluginInformation info) {
         super(info);
@@ -49,31 +58,46 @@ public class TimeFilterPlugin extends Plugin {
         StyleRegistration.cleanupStalePrefs();
 
         this.controller = new TimeFilterController();
-        this.dialog = new TimeFilterDialog(controller);
         this.layerListener = new DataLayerListener(
                 ds -> {/* on active layer change: nothing extra to do */},
-                dialog::onDataChanged);
+                this::forwardDataChanged);
 
         // Mid-session install: JOSM does not call mapFrameInitialized
         // retroactively for an already-open MapFrame, so wire up here
         // if one exists.
         MapFrame existing = MainApplication.getMap();
         if (existing != null) {
-            existing.addToggleDialog(dialog);
+            attachFreshDialog(existing);
             layerListener.install();
         }
     }
 
     @Override
     public void mapFrameInitialized(MapFrame oldFrame, MapFrame newFrame) {
-        if (oldFrame == null && newFrame != null) {
-            newFrame.addToggleDialog(dialog);
-            layerListener.install();
-        } else if (oldFrame != null && newFrame == null) {
+        if (newFrame != null) {
+            // Always build a fresh dialog. If we got here because the
+            // last MapFrame was closed and a new one is being opened
+            // (close-then-download flow), the previous dialog instance
+            // had its title-bar destroyed and can't be re-docked.
+            attachFreshDialog(newFrame);
+            if (oldFrame == null) {
+                layerListener.install();
+            }
+        } else if (oldFrame != null) {
+            // Last layer closed.
             layerListener.uninstall();
             controller.clear();
-        } else if (oldFrame != null && newFrame != null) {
-            newFrame.addToggleDialog(dialog);
+            dialog = null;
         }
+    }
+
+    private void attachFreshDialog(MapFrame frame) {
+        dialog = new TimeFilterDialog(controller);
+        frame.addToggleDialog(dialog);
+    }
+
+    private void forwardDataChanged() {
+        TimeFilterDialog d = dialog;
+        if (d != null) d.onDataChanged();
     }
 }
