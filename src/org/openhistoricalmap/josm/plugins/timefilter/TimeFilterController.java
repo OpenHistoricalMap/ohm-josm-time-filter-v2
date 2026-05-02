@@ -1,13 +1,20 @@
 // License: GPL. For details, see LICENSE file.
 package org.openhistoricalmap.josm.plugins.timefilter;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
+import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+
+import javax.swing.JOptionPane;
 
 import org.openhistoricalmap.josm.plugins.timefilter.classify.ClassificationCache;
 import org.openhistoricalmap.josm.plugins.timefilter.classify.Classifier;
@@ -22,6 +29,7 @@ import org.openhistoricalmap.josm.plugins.timefilter.model.Tier;
 import org.openhistoricalmap.josm.plugins.timefilter.model.TimeWindow;
 import org.openhistoricalmap.josm.plugins.timefilter.parse.DateParser;
 import org.openhistoricalmap.josm.plugins.timefilter.parse.PrimitiveDateExtractor;
+import org.openhistoricalmap.josm.plugins.timefilter.pref.TimeFilterPreferences;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
@@ -30,7 +38,9 @@ import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.event.DataChangedEvent;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.MapFrame;
+import org.openstreetmap.josm.gui.Notification;
 import org.openstreetmap.josm.gui.layer.OsmDataLayer;
+import org.openstreetmap.josm.gui.util.GuiHelper;
 import org.openstreetmap.josm.tools.Logging;
 
 /**
@@ -199,6 +209,147 @@ public final class TimeFilterController {
         } catch (RuntimeException e) {
             Logging.warn(e);
         }
+    }
+
+    /**
+     * Filter the active layer using the current JOSM selection's
+     * {@code start_date} / {@code end_date} tags as the focus point.
+     * Convenience overload that uses the offset persisted in
+     * {@link TimeFilterPreferences} (defaulting to 0). Equivalent to
+     * what the dialog's "Filter to Selection" button does.
+     *
+     * <p>This is part of the plugin's stable public API — see
+     * {@link TimeFilterPlugin#filterToSelection()}.</p>
+     *
+     * @param onComplete optional callback fired on the EDT after the
+     *                   filter has applied (or after an early-failure
+     *                   notification has been shown). May be {@code null}.
+     */
+    public void filterToSelection(Runnable onComplete) {
+        filterToSelection(TimeFilterPreferences.loadOffsetDays(0), onComplete);
+    }
+
+    /**
+     * Filter the active layer using the current JOSM selection's
+     * {@code start_date} / {@code end_date} tags as the focus point,
+     * with an explicit ± window offset.
+     *
+     * <p>Failures (no active layer, no selection, no parseable dates)
+     * are surfaced via JOSM Notifications. After a successful apply,
+     * a follow-up Notification fires if any of the originally-selected
+     * primitives ended up FAINT (hidden from view).</p>
+     *
+     * @param offsetDays the ± window offset in days; persisted to
+     *                   preferences as a side effect of the apply.
+     * @param onComplete optional EDT-bound callback fired after the
+     *                   filter has applied (or after the early-failure
+     *                   notification, if there was one).
+     */
+    public void filterToSelection(int offsetDays, Runnable onComplete) {
+        DataSet ds = activeDataSet();
+        if (ds == null) {
+            notifyError(tr("No active OSM data layer."));
+            runOnEdt(onComplete);
+            return;
+        }
+        Collection<OsmPrimitive> selected = ds.getSelected();
+        if (selected.isEmpty()) {
+            notifyError(tr("Nothing selected."));
+            runOnEdt(onComplete);
+            return;
+        }
+        Long focusEpoch = computeFocusEpoch(selected);
+        if (focusEpoch == null) {
+            notifyError(tr("Selection has no defined dates."));
+            runOnEdt(onComplete);
+            return;
+        }
+
+        LocalDate focus = LocalDate.ofEpochDay(focusEpoch);
+        String formatted = formatLocalDate(focus);
+        Set<OsmPrimitive> snapshot = new HashSet<>(selected);
+        TimeFilterPreferences.save(formatted, offsetDays);
+        apply(formatted, offsetDays, () -> {
+            int hidden = 0;
+            for (OsmPrimitive p : snapshot) {
+                if (p.isDisabledAndHidden()) hidden++;
+            }
+            if (hidden > 0) {
+                NumberFormat nf = NumberFormat.getIntegerInstance();
+                notifyError(tr("Filter date hides {0} of {1} selected items.",
+                        nf.format(hidden), nf.format(snapshot.size())));
+            }
+            if (onComplete != null) onComplete.run();
+        });
+    }
+
+    /**
+     * Compute a focus-day epoch (in {@link LocalDate#ofEpochDay} terms)
+     * from a JOSM selection. Returns {@code null} if no member of the
+     * selection has a defined {@code start_date} or {@code end_date}.
+     *
+     * <p>Single-primitive special case: if exactly one primitive is
+     * selected and it has only one of (start, end) defined, that
+     * endpoint is returned directly. Otherwise the focus is the
+     * arithmetic mean of every defined endpoint across the selection
+     * (open ends are skipped).</p>
+     *
+     * <p>Public helper exposed for cross-plugin use; the dialog button
+     * and {@link TimeFilterPlugin#filterToSelection()} both go through
+     * the {@link #filterToSelection(Runnable)} entry points which call
+     * this internally.</p>
+     */
+    public static Long computeFocusEpoch(Collection<? extends OsmPrimitive> selected) {
+        if (selected.size() == 1) {
+            OsmPrimitive only = selected.iterator().next();
+            DateRange r = PrimitiveDateExtractor.extract(only);
+            if (r.isUnparseable()) return null;
+            boolean startDef = !r.getStart().isInfinity();
+            boolean endDef = !r.getEnd().isInfinity();
+            if (startDef && !endDef) return r.getStart().earliestEpochDay();
+            if (!startDef && endDef) return r.getEnd().latestEpochDay();
+            if (startDef && endDef) {
+                return (r.getStart().earliestEpochDay() + r.getEnd().latestEpochDay()) / 2;
+            }
+            return null;
+        }
+        long sum = 0;
+        int count = 0;
+        for (OsmPrimitive p : selected) {
+            DateRange r = PrimitiveDateExtractor.extract(p);
+            if (r.isUnparseable()) continue;
+            if (!r.getStart().isInfinity()) {
+                sum += r.getStart().earliestEpochDay();
+                count++;
+            }
+            if (!r.getEnd().isInfinity()) {
+                sum += r.getEnd().latestEpochDay();
+                count++;
+            }
+        }
+        if (count == 0) return null;
+        return sum / count;
+    }
+
+    /**
+     * Format a {@link LocalDate} in the {@code YYYY-MM-DD} (or
+     * {@code -YYYY-MM-DD} for BCE) form that the dialog's filter-date
+     * field accepts.
+     */
+    public static String formatLocalDate(LocalDate ld) {
+        int y = ld.getYear();
+        if (y < 0) {
+            return String.format("-%04d-%02d-%02d", -y, ld.getMonthValue(), ld.getDayOfMonth());
+        }
+        return String.format("%04d-%02d-%02d", y, ld.getMonthValue(), ld.getDayOfMonth());
+    }
+
+    private static void notifyError(String msg) {
+        new Notification(msg).setIcon(JOptionPane.ERROR_MESSAGE).show();
+    }
+
+    private static void runOnEdt(Runnable r) {
+        if (r != null) GuiHelper.runInEDT(r);
     }
 
     /**

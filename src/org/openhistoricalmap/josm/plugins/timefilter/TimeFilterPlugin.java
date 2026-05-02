@@ -47,6 +47,15 @@ import org.openstreetmap.josm.plugins.PluginInformation;
  */
 public class TimeFilterPlugin extends Plugin {
 
+    /**
+     * Singleton handle for the cross-plugin reflection entry point
+     * {@link #filterToSelection()}. Set at the end of the constructor
+     * so callers never observe a partially-built instance. {@code
+     * volatile} so non-EDT callers see the most-recently-constructed
+     * value.
+     */
+    private static volatile TimeFilterPlugin INSTANCE;
+
     private final TimeFilterController controller;
     private final DataLayerListener layerListener;
     /** Rebuilt on every transition into a fresh MapFrame; {@code null} between. */
@@ -70,6 +79,45 @@ public class TimeFilterPlugin extends Plugin {
             attachFreshDialog(existing);
             layerListener.install();
         }
+
+        INSTANCE = this;
+    }
+
+    /**
+     * Public API. Filter the active layer using the current JOSM
+     * selection's {@code start_date} / {@code end_date} tags as the
+     * focus point — equivalent to clicking the dialog's "Filter to
+     * Selection" button.
+     *
+     * <p>Intended for invocation from other plugins via reflection,
+     * with no compile-time dependency on this plugin:</p>
+     *
+     * <pre>{@code
+     * try {
+     *     Class<?> tfp = Class.forName(
+     *         "org.openhistoricalmap.josm.plugins.timefilter.TimeFilterPlugin");
+     *     tfp.getMethod("filterToSelection").invoke(null);
+     * } catch (ReflectiveOperationException ignored) {
+     *     // OHM_Time_Filter not loaded — silent no-op.
+     * }
+     * }</pre>
+     *
+     * <p>Behavior: derives a focus epoch from the selection (single
+     * primitive with one open endpoint → that endpoint; otherwise →
+     * arithmetic mean of every defined endpoint), then applies the
+     * filter using that date and the offset persisted in preferences.
+     * User-facing failures (no active layer, no selection, no
+     * parseable dates, hidden items in the original selection) are
+     * surfaced via JOSM Notifications.</p>
+     *
+     * <p>No-op if the plugin isn't fully initialised.</p>
+     *
+     * <p><b>Stable API since v0.3.0.</b></p>
+     */
+    public static void filterToSelection() {
+        TimeFilterPlugin instance = INSTANCE;
+        if (instance == null) return;
+        instance.controller.filterToSelection(null);
     }
 
     @Override

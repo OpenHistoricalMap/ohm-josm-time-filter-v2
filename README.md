@@ -95,6 +95,35 @@ core/                   JOSM trunk svn checkout (gitignored)
 lib/                    Test deps — junit / hamcrest (gitignored)
 ```
 
+## Public API for other plugins
+
+Since v0.3.0, other JOSM plugins can trigger the **Filter to Selection**
+behavior without a compile-time dependency on `OHM_Time_Filter`. Use
+reflection so the call is a silent no-op when the plugin isn't
+installed:
+
+```java
+try {
+    Class<?> tfp = Class.forName(
+        "org.openhistoricalmap.josm.plugins.timefilter.TimeFilterPlugin");
+    tfp.getMethod("filterToSelection").invoke(null);
+} catch (ReflectiveOperationException ignored) {
+    // OHM_Time_Filter not loaded — leave the user alone.
+}
+```
+
+The static method:
+
+- reads the current JOSM selection,
+- derives a focus date (single primitive with one open endpoint → that
+  endpoint; otherwise → arithmetic mean of every defined endpoint),
+- applies the filter using the persisted ± window offset,
+- surfaces user-facing failures (no active layer, no selection, no
+  parseable dates, hidden-after-apply) via JOSM Notifications.
+
+It's the same code path the dialog's **Filter to Selection** button
+uses, so the two stay in lockstep.
+
 ## Contributing
 
 Pull requests and issues welcome. Two one-time setup steps before your first

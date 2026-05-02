@@ -12,9 +12,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.text.NumberFormat;
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -31,15 +28,10 @@ import javax.swing.text.NumberFormatter;
 
 import org.openhistoricalmap.josm.plugins.timefilter.TimeFilterController;
 import org.openhistoricalmap.josm.plugins.timefilter.classify.ClassificationCache;
-import org.openhistoricalmap.josm.plugins.timefilter.model.DateRange;
 import org.openhistoricalmap.josm.plugins.timefilter.model.OhmDate;
 import org.openhistoricalmap.josm.plugins.timefilter.model.TimeWindow;
 import org.openhistoricalmap.josm.plugins.timefilter.parse.DateParser;
-import org.openhistoricalmap.josm.plugins.timefilter.parse.PrimitiveDateExtractor;
 import org.openhistoricalmap.josm.plugins.timefilter.pref.TimeFilterPreferences;
-import org.openstreetmap.josm.data.osm.DataSet;
-import org.openstreetmap.josm.data.osm.OsmPrimitive;
-import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.Notification;
 import org.openstreetmap.josm.gui.dialogs.ToggleDialog;
 import org.openstreetmap.josm.gui.widgets.DisableShortcutsOnFocusGainedTextField;
@@ -298,16 +290,8 @@ public final class TimeFilterDialog extends ToggleDialog {
         if (years != 0)  ld = ld.plusYears(years);
         if (months != 0) ld = ld.plusMonths(months);
         if (days != 0)   ld = ld.plusDays(days);
-        setPointField.setText(formatLocalDate(ld));
+        setPointField.setText(TimeFilterController.formatLocalDate(ld));
         doApply();
-    }
-
-    private static String formatLocalDate(LocalDate ld) {
-        int y = ld.getYear();
-        if (y < 0) {
-            return String.format("-%04d-%02d-%02d", -y, ld.getMonthValue(), ld.getDayOfMonth());
-        }
-        return String.format("%04d-%02d-%02d", y, ld.getMonthValue(), ld.getDayOfMonth());
     }
 
     private void doApply() {
@@ -341,92 +325,26 @@ public final class TimeFilterDialog extends ToggleDialog {
     }
 
     /**
-     * "Filter to Selection": derive a focus date from the currently
-     * selected primitives and apply.
-     *
-     * - 1 selected primitive with one open endpoint: focus = the defined
-     *   endpoint (start.earliest if start is defined, end.latest if end is).
-     * - Otherwise: focus = average of every defined endpoint across all
-     *   selected primitives (open ends are skipped).
-     *
-     * If applying that date hides any of the original selection (FAINT
-     * tier → setDisabledState(true)), surface a warning so the user knows
-     * the average couldn't cover everything.
+     * Wrap {@link TimeFilterController#filterToSelection(int, Runnable)}
+     * with the dialog UI sync (setPointField text + filter-status icon).
+     * The same code path is exposed publicly via
+     * {@link TimeFilterPlugin#filterToSelection()}, so the button and
+     * the cross-plugin entry point stay in lockstep.
      */
-    private void doFilterToSelection() {
-        DataSet ds = MainApplication.getLayerManager() == null ? null
-                : MainApplication.getLayerManager().getEditDataSet();
-        if (ds == null) {
-            showError(tr("No active OSM data layer."));
-            return;
-        }
-        Collection<OsmPrimitive> selected = ds.getSelected();
-        if (selected.isEmpty()) {
-            showError(tr("Nothing selected."));
-            return;
-        }
-        Long focusEpoch = computeFocusEpoch(selected);
-        if (focusEpoch == null) {
-            showError(tr("Selection has no defined dates."));
-            return;
-        }
-
-        LocalDate focus = LocalDate.ofEpochDay(focusEpoch);
-        String formatted = formatLocalDate(focus);
-        setPointField.setText(formatted);
-        markFieldInvalid(false);
-
-        // Snapshot before apply — the controller deselects FAINT primitives,
-        // and the post-apply ds.getSelected() would no longer contain them.
-        Set<OsmPrimitive> snapshot = new HashSet<>(selected);
-
-        int offsetDays = currentOffsetDays();
-        TimeFilterPreferences.save(formatted, offsetDays);
-        controller.apply(formatted, offsetDays, () -> {
+    void doFilterToSelection() {
+        controller.filterToSelection(currentOffsetDays(), () -> {
+            // Sync the date field to whatever the controller actually
+            // applied, so the user sees the chosen focus date in the
+            // dialog after the worker job completes.
+            TimeFilterController.Result r = controller.getLastResult();
+            if (r.ok && r.window != null) {
+                setPointField.setText(TimeFilterController.formatLocalDate(
+                        LocalDate.ofEpochDay(r.window.getSetPointDay())));
+                markFieldInvalid(false);
+            }
             refreshStatus();
-            int hidden = 0;
-            for (OsmPrimitive p : snapshot) {
-                if (p.isDisabledAndHidden()) hidden++;
-            }
-            if (hidden > 0) {
-                NumberFormat nf = NumberFormat.getIntegerInstance();
-                showError(tr("Filter date hides {0} of {1} selected items.",
-                        nf.format(hidden), nf.format(snapshot.size())));
-            }
         });
         warningLine.setText(" ");
-    }
-
-    private static Long computeFocusEpoch(Collection<OsmPrimitive> selected) {
-        if (selected.size() == 1) {
-            OsmPrimitive only = selected.iterator().next();
-            DateRange r = PrimitiveDateExtractor.extract(only);
-            if (r.isUnparseable()) return null;
-            boolean startDef = !r.getStart().isInfinity();
-            boolean endDef = !r.getEnd().isInfinity();
-            if (startDef && !endDef) return r.getStart().earliestEpochDay();
-            if (!startDef && endDef) return r.getEnd().latestEpochDay();
-            if (startDef && endDef) {
-                return (r.getStart().earliestEpochDay() + r.getEnd().latestEpochDay()) / 2;
-            }
-            return null;
-        }
-        long sum = 0;
-        int count = 0;
-        for (OsmPrimitive p : selected) {
-            DateRange r = PrimitiveDateExtractor.extract(p);
-            if (r.isUnparseable()) continue;
-            if (!r.getStart().isInfinity()) {
-                sum += r.getStart().earliestEpochDay();
-                count++;
-            }
-            if (!r.getEnd().isInfinity()) {
-                sum += r.getEnd().latestEpochDay();
-                count++;
-            }
-        }
-        if (count == 0) return null;
-        return sum / count;
     }
 
     private void refreshStatus() {
