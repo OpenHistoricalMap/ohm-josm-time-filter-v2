@@ -128,8 +128,13 @@ public final class TimeFilterController {
                 Result r = classifyAndApply(dataSet, window);
                 lastResult.set(r);
                 active = true;
-                ensureStyleAttached();
-                org.openstreetmap.josm.gui.util.GuiHelper.runInEDT(onComplete);
+                // ensureStyleAttached() calls MapPaintStyles.addStyle() which
+                // modifies a list that the EDT iterates during paint — must run
+                // on EDT to avoid ConcurrentModificationException.
+                org.openstreetmap.josm.gui.util.GuiHelper.runInEDT(() -> {
+                    ensureStyleAttached();
+                    onComplete.run();
+                });
             } catch (RuntimeException e) {
                 Logging.error(e);
                 lastResult.set(Result.invalid("Classification failed: " + e.getMessage()));
